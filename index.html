@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Crime Scene Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;600;800&display=swap');
+ 
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+  :root {
+    --red: #e24b4a;
+    --red-dark: #a32d2d;
+    --amber: #ef9f27;
+    --green: #1d9e75;
+    --bg: #0a0c10;
+    --bg2: #0f1218;
+    --bg3: #141820;
+    --border: rgba(226,75,74,0.25);
+    --border2: rgba(226,75,74,0.12);
+    --text: #e8e6e0;
+    --muted: #888780;
+    --mono: 'Share Tech Mono', monospace;
+    --head: 'Rajdhani', sans-serif;
+    --body: 'Exo 2', sans-serif;
+  }
+ 
+  html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--body); }
+ 
+  body {
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(226,75,74,0.04) 39px, rgba(226,75,74,0.04) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(226,75,74,0.04) 39px, rgba(226,75,74,0.04) 40px);
+    background-size: 40px 40px;
+  }
+ 
+  .scanline {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  }
+ 
+  .wrapper { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+ 
+  /* HEADER */
+  .header { text-align: center; padding: 2.5rem 0 2rem; position: relative; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(226,75,74,0.12); border: 1px solid rgba(226,75,74,0.35);
+    color: var(--red); font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+    padding: 5px 14px; border-radius: 2px; margin-bottom: 1.2rem;
+    text-transform: uppercase;
+  }
+  .badge::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--red); animation: blink 1.2s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+ 
+  h1 {
+    font-family: var(--head); font-size: clamp(2rem, 6vw, 3.8rem); font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; line-height: 1;
+    color: #f5f2ed;
+    text-shadow: 0 0 60px rgba(226,75,74,0.35);
+    margin-bottom: 0.5rem;
+  }
+  h1 span { color: var(--red); }
+  .sub { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.15em; margin-top: 0.8rem; }
+ 
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--red), transparent); margin: 2rem 0; opacity: 0.5; }
+ 
+  /* API KEY INPUT */
+  .api-section { margin-bottom: 1.5rem; }
+  .section-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; color: var(--red);
+    text-transform: uppercase; margin-bottom: 0.6rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::before { content: '//'; }
+  .api-input-wrap { display: flex; gap: 10px; align-items: center; }
+  .api-input {
+    flex: 1; background: var(--bg2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 13px;
+    padding: 0.6rem 1rem; border-radius: 3px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .api-input:focus { border-color: var(--red); }
+  .api-input::placeholder { color: var(--muted); }
+  .api-note { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 0.4rem; }
+  .api-note a { color: var(--red); text-decoration: none; }
+ 
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 1.5px dashed rgba(226,75,74,0.4); border-radius: 4px;
+    background: rgba(226,75,74,0.03);
+    padding: 3rem 2rem; text-align: center; cursor: pointer;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--red); background: rgba(226,75,74,0.07); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 2.5rem; margin-bottom: 0.8rem; line-height: 1; }
+  .upload-title { font-family: var(--head); font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; color: #ccc; margin-bottom: 0.3rem; }
+  .upload-hint { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .corner { position: absolute; width: 12px; height: 12px; border-color: var(--red); border-style: solid; opacity: 0.6; }
+  .corner.tl { top: 8px; left: 8px; border-width: 1.5px 0 0 1.5px; }
+  .corner.tr { top: 8px; right: 8px; border-width: 1.5px 1.5px 0 0; }
+  .corner.bl { bottom: 8px; left: 8px; border-width: 0 0 1.5px 1.5px; }
+  .corner.br { bottom: 8px; right: 8px; border-width: 0 1.5px 1.5px 0; }
+ 
+  /* PREVIEW */
+  .preview-wrap { display: none; margin-top: 1.2rem; }
+  .preview-img {
+    width: 100%; max-height: 360px; object-fit: contain;
+    border: 1px solid var(--border); border-radius: 4px;
+    display: block;
+  }
+  .preview-overlay {
+    position: relative; border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+    background: #000;
+  }
+  .preview-overlay::after {
+    content: 'EVIDENCE #' attr(data-id);
+    position: absolute; top: 10px; left: 10px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+    color: var(--red); background: rgba(0,0,0,0.7); padding: 3px 8px;
+  }
+  .preview-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 0.5rem; }
+ 
+  /* BUTTON */
+  .btn-analyze {
+    width: 100%; margin-top: 1.5rem;
+    background: var(--red); color: #fff; border: none; cursor: pointer;
+    font-family: var(--head); font-size: 1rem; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    padding: 1rem 2rem; border-radius: 3px;
+    transition: all 0.2s; position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .btn-analyze:hover:not(:disabled) { background: var(--red-dark); transform: translateY(-1px); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-analyze::before {
+    content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    transition: left 0.4s;
+  }
+  .btn-analyze:hover:not(:disabled)::before { left: 100%; }
+ 
+  /* LOADER */
+  .loader { display: none; text-align: center; padding: 2.5rem 1rem; }
+  .loader-bar-wrap { width: 100%; height: 2px; background: rgba(255,255,255,0.06); border-radius: 1px; margin: 1.2rem 0; overflow: hidden; }
+  .loader-bar { height: 100%; width: 0%; background: var(--red); border-radius: 1px; animation: load 3s ease-in-out forwards; }
+  @keyframes load { 0%{width:0%} 60%{width:80%} 100%{width:95%} }
+  .loader-text { font-family: var(--mono); font-size: 12px; color: var(--muted); animation: flicker 0.5s step-end infinite; }
+  @keyframes flicker { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .loader-steps { font-family: var(--mono); font-size: 10px; color: rgba(226,75,74,0.7); margin-top: 0.5rem; }
+ 
+  /* REPORT */
+  .report { display: none; margin-top: 2rem; }
+  .report-header {
+    background: rgba(226,75,74,0.08); border: 1px solid var(--border);
+    border-radius: 4px 4px 0 0; padding: 1rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .report-title { font-family: var(--head); font-size: 1rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .timestamp { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .report-body { border: 1px solid var(--border2); border-top: none; border-radius: 0 0 4px 4px; }
+  .report-section { padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border2); }
+  .report-section:last-child { border-bottom: none; }
+  .rs-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 0.7rem;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .rs-label .icon { font-size: 12px; }
+ 
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-family: var(--mono); font-size: 11px; padding: 4px 10px; border-radius: 2px;
+    border: 1px solid; letter-spacing: 0.05em;
+  }
+  .tag-obj { border-color: rgba(55,138,221,0.4); color: #85b7eb; background: rgba(55,138,221,0.08); }
+  .tag-clue { border-color: rgba(239,159,39,0.4); color: var(--amber); background: rgba(239,159,39,0.08); }
+ 
+  .scenario-text {
+    font-size: 0.95rem; line-height: 1.7; color: var(--text);
+    font-family: var(--body); font-weight: 300;
+    border-left: 2px solid var(--red); padding-left: 1rem;
+  }
+ 
+  .risk-wrap { display: flex; align-items: center; gap: 1.5rem; }
+  .risk-badge {
+    font-family: var(--head); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.1em;
+    padding: 0.4rem 1.2rem; border-radius: 3px; text-transform: uppercase;
+  }
+  .risk-low { color: var(--green); border: 1.5px solid rgba(29,158,117,0.4); background: rgba(29,158,117,0.1); }
+  .risk-medium { color: var(--amber); border: 1.5px solid rgba(239,159,39,0.4); background: rgba(239,159,39,0.1); }
+  .risk-high { color: var(--red); border: 1.5px solid rgba(226,75,74,0.4); background: rgba(226,75,74,0.1); }
+  .risk-meter { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+  .risk-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+  .risk-fill-low { background: var(--green); width: 33%; }
+  .risk-fill-medium { background: var(--amber); width: 66%; }
+  .risk-fill-high { background: var(--red); width: 100%; animation: pulse-bar 1s ease-in-out infinite alternate; }
+  @keyframes pulse-bar { from{opacity:0.7} to{opacity:1} }
+ 
+  .confidence-row { display: flex; align-items: center; gap: 10px; }
+  .conf-bar-wrap { flex: 1; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+  .conf-fill { height: 100%; background: var(--red); border-radius: 2px; }
+  .conf-val { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 36px; text-align: right; }
+ 
+  .error-box {
+    display: none; background: rgba(226,75,74,0.08); border: 1px solid rgba(226,75,74,0.3);
+    border-radius: 4px; padding: 1rem 1.2rem; margin-top: 1.2rem;
+    font-family: var(--mono); font-size: 12px; color: var(--red);
+  }
+ 
+  /* STATS */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 1.5rem; }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 0.8rem 1rem; text-align: center;
+  }
+  .stat-val { font-family: var(--head); font-size: 1.4rem; font-weight: 700; color: var(--red); }
+  .stat-key { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
+ 
+  .reveal { animation: fadeUp 0.4s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+ 
+  .new-btn {
+    margin-top: 1.2rem; width: 100%;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; padding: 0.7rem;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+    border-radius: 3px; text-transform: uppercase; transition: all 0.2s;
+  }
+  .new-btn:hover { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+<div class="wrapper">
+ 
+  <!-- HEADER -->
+  <div class="header">
+    <div class="badge">classified system — authorized use only</div>
+    <h1>AI Crime Scene<br><span>Analyzer</span></h1>
+    <div class="sub">forensic intelligence unit · neural evidence processing · v2.4.1</div>
+  </div>
+ 
+  <div class="divider"></div>
+ 
+  <!-- API KEY -->
+  <div class="api-section">
+    <div class="section-label">anthropic api key</div>
+    <div class="api-input-wrap">
+      <input class="api-input" type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off">
+    </div>
+    <div class="api-note">
+      Your key is never stored or sent anywhere except directly to Anthropic.
+      Get one at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+    </div>
+  </div>
+ 
+  <!-- UPLOAD -->
+  <div class="section-label">upload evidence image</div>
+  <div class="upload-zone" id="dropZone">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <input type="file" id="fileInput" accept="image/png,image/jpeg,image/jpg,image/webp">
+    <div class="upload-icon">🔍</div>
+    <div class="upload-title">Drop evidence image here</div>
+    <div class="upload-hint">JPG · PNG · JPEG · WEBP — max 10MB</div>
+  </div>
+ 
+  <!-- PREVIEW -->
+  <div class="preview-wrap" id="previewWrap">
+    <div class="preview-overlay" id="previewOverlay" data-id="001">
+      <img class="preview-img" id="previewImg" alt="Evidence">
+    </div>
+    <div class="preview-meta" id="previewMeta"></div>
+  </div>
+ 
+  <div class="error-box" id="errorBox"></div>
+ 
+  <!-- ANALYZE BUTTON -->
+  <button class="btn-analyze" id="analyzeBtn" disabled>
+    <span id="btnIcon">⚡</span>
+    <span id="btnText">Analyze Scene</span>
+  </button>
+ 
+  <!-- LOADER -->
+  <div class="loader" id="loader">
+    <div class="loader-text" id="loaderText">INITIALIZING NEURAL FORENSICS...</div>
+    <div class="loader-bar-wrap"><div class="loader-bar" id="loaderBar"></div></div>
+    <div class="loader-steps" id="loaderSteps">scanning image matrix...</div>
+  </div>
+ 
+  <!-- REPORT -->
+  <div class="report" id="report">
+    <div class="report-header">
+      <div class="report-title">🗂 Investigation Report</div>
+      <div class="timestamp" id="reportTime"></div>
+    </div>
+    <div class="report-body">
+ 
+      <div class="report-section reveal" style="animation-delay:0.1s">
+        <div class="rs-label"><span class="icon">📦</span> Objects detected</div>
+        <div class="tags" id="objTags"></div>
+      </div>
+ 
+      <div class="report-section reveal" style="animation-delay:0.2s">
+        <div class="rs-label"><span class="icon">🔎</span> Suspicious clues</div>
+        <div class="tags" id="clueTags"></div>
+      </div>
+ 
+      <div class="report-section reveal" style="animation-delay:0.3s">
+        <div class="rs-label"><span class="icon">📋</span> Possible scenario</div>
+        <p class="scenario-text" id="scenarioText"></p>
+      </div>
+ 
+      <div class="report-section reveal" style="animation-delay:0.4s">
+        <div class="rs-label"><span class="icon">⚠</span> Risk level</div>
+        <div class="risk-wrap">
+          <div class="risk-badge" id="riskBadge">—</div>
+          <div class="risk-meter"><div class="risk-fill" id="riskFill"></div></div>
+        </div>
+      </div>
+ 
+      <div class="report-section reveal" style="animation-delay:0.5s">
+        <div class="rs-label"><span class="icon">📊</span> Analysis confidence</div>
+        <div id="confidenceRows"></div>
+      </div>
+ 
+    </div>
+  </div>
+ 
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-card reveal"><div class="stat-val" id="sObj">0</div><div class="stat-key">Objects Found</div></div>
+    <div class="stat-card reveal"><div class="stat-val" id="sClue">0</div><div class="stat-key">Clues Detected</div></div>
+    <div class="stat-card reveal"><div class="stat-val" id="sConf">0%</div><div class="stat-key">Avg Confidence</div></div>
+  </div>
+ 
+  <button class="new-btn" id="newBtn" style="display:none" onclick="resetAll()">[ new investigation ]</button>
+ 
+</div>
+ 
+<script>
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const fileInput     = document.getElementById('fileInput');
+  const dropZone      = document.getElementById('dropZone');
+  const previewWrap   = document.getElementById('previewWrap');
+  const previewImg    = document.getElementById('previewImg');
+  const previewMeta   = document.getElementById('previewMeta');
+  const previewOverlay= document.getElementById('previewOverlay');
+  const analyzeBtn    = document.getElementById('analyzeBtn');
+  const loader        = document.getElementById('loader');
+  const loaderText    = document.getElementById('loaderText');
+  const loaderSteps   = document.getElementById('loaderSteps');
+  const loaderBar     = document.getElementById('loaderBar');
+  const report        = document.getElementById('report');
+  const errorBox      = document.getElementById('errorBox');
+  const statsRow      = document.getElementById('statsRow');
+  const newBtn        = document.getElementById('newBtn');
+  const apiKeyInput   = document.getElementById('apiKey');
+ 
+  let currentBase64 = null;
+  let currentMime   = null;
+  let evidenceNum   = 0;
+ 
+  // Loading animation messages
+  const loadSteps = [
+    'scanning image matrix...',
+    'detecting object signatures...',
+    'cross-referencing forensic database...',
+    'analyzing environmental context...',
+    'reconstructing incident timeline...',
+    'calculating risk vectors...',
+    'compiling investigation report...'
+  ];
+ 
+  // ── File handling ─────────────────────────────────────────────────────────
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    handleFile(e.dataTransfer.files[0]);
+  });
+ 
+  function handleFile(file) {
+    if (!file) return;
+    const allowed = ['image/png','image/jpeg','image/jpg','image/webp'];
+    if (!allowed.includes(file.type)) { showError('Unsupported file type. Use JPG, PNG, JPEG, or WEBP.'); return; }
+    if (file.size > 10 * 1024 * 1024) { showError('File too large. Max size is 10MB.'); return; }
+    hideError();
+ 
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const src = ev.target.result;
+      currentBase64 = src.split(',')[1];
+      currentMime   = file.type;
+      previewImg.src = src;
+      evidenceNum++;
+      previewOverlay.setAttribute('data-id', String(evidenceNum).padStart(3,'0'));
+      previewMeta.textContent = `file: ${file.name}   size: ${(file.size/1024).toFixed(1)}kb   type: ${file.type}`;
+      previewWrap.style.display = 'block';
+      analyzeBtn.disabled = false;
+      report.style.display = 'none';
+      statsRow.style.display = 'none';
+      newBtn.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+ 
+  // ── Analyze ───────────────────────────────────────────────────────────────
+  analyzeBtn.addEventListener('click', analyzeScene);
+ 
+  async function analyzeScene() {
+    const apiKey = apiKeyInput.value.trim();
+    if (!apiKey) { showError('Please enter your Anthropic API key above.'); return; }
+    if (!currentBase64) { showError('Please upload an image first.'); return; }
+ 
+    // Reset UI
+    analyzeBtn.disabled = true;
+    document.getElementById('btnText').textContent = 'Analyzing...';
+    report.style.display = 'none';
+    statsRow.style.display = 'none';
+    newBtn.style.display = 'none';
+    hideError();
+ 
+    // Show loader
+    loader.style.display = 'block';
+    loaderBar.style.animation = 'none';
+    loaderBar.style.width = '0%';
+    void loaderBar.offsetWidth; // force reflow
+    loaderBar.style.animation = 'load 4s ease-in-out forwards';
+ 
+    // Cycle through loading messages
+    let stepIdx = 0;
+    const stepInterval = setInterval(() => {
+      loaderSteps.textContent = loadSteps[stepIdx % loadSteps.length];
+      stepIdx++;
+    }, 900);
+ 
+    const loaderMessages = [
+      'INITIALIZING NEURAL FORENSICS...',
+      'PROCESSING VISUAL SIGNATURES...',
+      'CROSS-REFERENCING EVIDENCE...',
+      'GENERATING INCIDENT REPORT...'
+    ];
+    let msgIdx = 0;
+    const msgInterval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % loaderMessages.length;
+      loaderText.textContent = loaderMessages[msgIdx];
+    }, 1800);
+ 
+    // Prompt for structured JSON output
+    const systemPrompt = `You are an elite AI forensic investigator. Analyze crime scene images with expert precision.
+Return ONLY a valid JSON object (no markdown, no extra text) with this exact structure:
+{
+  "objects": ["item1", "item2", ...],
+  "clues": ["clue1", "clue2", ...],
+  "scenario": "A detailed paragraph describing what likely happened",
+  "risk": "Low" or "Medium" or "High",
+  "confidence": {
+    "object_detection": 85,
+    "scene_reconstruction": 78,
+    "threat_assessment": 92
+  }
+}
+Be specific, clinical, and professional. Objects = concrete physical items. Clues = forensic observations.`;
+ 
+    const userPrompt = `Analyze this scene as a crime scene investigator. Identify all objects, suspicious clues, reconstruct a possible scenario, and assess the risk level. Return JSON only.`;
+ 
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: currentMime, data: currentBase64 } },
+              { type: 'text', text: userPrompt }
+            ]
+          }]
+        })
+      });
+ 
+      clearInterval(stepInterval);
+      clearInterval(msgInterval);
+ 
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error?.message || `API error: ${resp.status}`);
+      }
+ 
+      const data = await resp.json();
+      const raw  = data.content.map(b => b.text || '').join('').trim();
+      const clean = raw.replace(/```json|```/g, '').trim();
+ 
+      let result;
+      try {
+        result = JSON.parse(clean);
+      } catch(e) {
+        const match = clean.match(/\{[\s\S]*\}/);
+        if (match) result = JSON.parse(match[0]);
+        else throw new Error('Failed to parse AI response as JSON');
+      }
+ 
+      loader.style.display = 'none';
+      renderReport(result);
+ 
+    } catch(err) {
+      clearInterval(stepInterval);
+      clearInterval(msgInterval);
+      loader.style.display = 'none';
+      analyzeBtn.disabled = false;
+      document.getElementById('btnText').textContent = 'Analyze Scene';
+      showError('Analysis failed: ' + err.message);
+    }
+  }
+ 
+  // ── Render Report ─────────────────────────────────────────────────────────
+  function renderReport(data) {
+    // Timestamp
+    document.getElementById('reportTime').textContent = new Date().toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+ 
+    // Objects
+    const objTags = document.getElementById('objTags');
+    objTags.innerHTML = '';
+    (data.objects || []).forEach(o => {
+      const t = document.createElement('span');
+      t.className = 'tag tag-obj';
+      t.textContent = o;
+      objTags.appendChild(t);
+    });
+ 
+    // Clues
+    const clueTags = document.getElementById('clueTags');
+    clueTags.innerHTML = '';
+    (data.clues || []).forEach(c => {
+      const t = document.createElement('span');
+      t.className = 'tag tag-clue';
+      t.textContent = c;
+      clueTags.appendChild(t);
+    });
+ 
+    // Scenario
+    document.getElementById('scenarioText').textContent = data.scenario || '—';
+ 
+    // Risk level
+    const risk = (data.risk || 'Low').toLowerCase();
+    const riskBadge = document.getElementById('riskBadge');
+    const riskFill  = document.getElementById('riskFill');
+    riskBadge.textContent = data.risk || 'Low';
+    riskBadge.className = 'risk-badge risk-' + risk;
+    riskFill.className  = 'risk-fill risk-fill-' + risk;
+ 
+    // Confidence bars
+    const conf = data.confidence || { object_detection: 80, scene_reconstruction: 75, threat_assessment: 70 };
+    const confRows = document.getElementById('confidenceRows');
+    confRows.innerHTML = '';
+    const confLabels = {
+      object_detection:    'Object Detection',
+      scene_reconstruction:'Scene Reconstruction',
+      threat_assessment:   'Threat Assessment'
+    };
+    let total = 0, count = 0;
+    Object.entries(conf).forEach(([k, v]) => {
+      total += v; count++;
+      const label = confLabels[k] || k;
+      const row = document.createElement('div');
+      row.className = 'confidence-row';
+      row.style.marginBottom = '8px';
+      row.innerHTML = `
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted);min-width:170px">${label}</span>
+        <div class="conf-bar-wrap"><div class="conf-fill" style="width:${v}%"></div></div>
+        <span class="conf-val">${v}%</span>`;
+      confRows.appendChild(row);
+    });
+ 
+    // Show everything
+    report.style.display = 'block';
+    document.getElementById('sObj').textContent  = (data.objects || []).length;
+    document.getElementById('sClue').textContent = (data.clues || []).length;
+    document.getElementById('sConf').textContent = count ? Math.round(total / count) + '%' : '—';
+    statsRow.style.display = 'grid';
+    newBtn.style.display = 'block';
+ 
+    analyzeBtn.disabled = false;
+    document.getElementById('btnText').textContent = 'Re-Analyze Scene';
+    document.getElementById('btnIcon').textContent = '🔄';
+ 
+    report.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+ 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showError(msg) {
+    errorBox.textContent = '[ ERROR ] ' + msg;
+    errorBox.style.display = 'block';
+  }
+  function hideError() { errorBox.style.display = 'none'; }
+ 
+  function resetAll() {
+    currentBase64 = null;
+    currentMime   = null;
+    previewWrap.style.display = 'none';
+    previewImg.src = '';
+    fileInput.value = '';
+    report.style.display = 'none';
+    statsRow.style.display = 'none';
+    newBtn.style.display = 'none';
+    analyzeBtn.disabled = true;
+    document.getElementById('btnText').textContent = 'Analyze Scene';
+    document.getElementById('btnIcon').textContent = '⚡';
+    hideError();
+  }
+</script>
+</body>
+</html>
+ 
